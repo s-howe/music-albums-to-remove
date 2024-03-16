@@ -3,6 +3,8 @@ from dataclasses import dataclass
 from pathlib import Path
 import inspect
 
+track_keys = {}
+
 
 # Some util functions
 def snake_case(title_case_str: str) -> str:
@@ -28,6 +30,8 @@ class Track:
     rating: int = 0
     track_number: int | None = None
     year: int | None = None
+    file_size: int = 0  # size in bytes
+    time: int | None = 0  # time in ms
 
     @classmethod
     def from_xml(cls, track_xml: ET.Element) -> "Track":
@@ -44,6 +48,13 @@ class Track:
         if "rating" in d:
             # Correct rating from XML % rating to star rating
             d["rating"] = star_rating(d["rating"])
+
+        # Correct keys for time and file_size
+        if "total_time" in d:
+            d["time"] = d.pop("total_time")
+
+        if "size" in d:
+            d["file_size"] = int(d.pop("size"))
 
         # Remove parameters not useful for this project
         dataclass_params = inspect.signature(cls).parameters
@@ -99,6 +110,14 @@ class Library:
     @property
     def size(self):
         return len(self.tracks)
+
+    @property
+    def file_size(self):
+        return sum(t.file_size for t in self.tracks)
+
+    @property
+    def total_time(self):
+        return sum(t.time for t in self.tracks)
 
     def __repr__(self):
         return f"Library(tracks={self.tracks[:10]}...)"
@@ -162,10 +181,14 @@ if __name__ == "__main__":
     library = Library.from_xml(LIBRARY_XML_PATH)
     albums = library.to_albums()
 
-    for album in albums:
-        if album.percent_rated > 0.5 and album.max_rating <= 3:
+    albums_sorted = sorted(albums, key=lambda a: a.file_size, reverse=True)
+
+    for album in albums_sorted:
+        if album.percent_rated > 0.01 and album.max_rating <= 3:
             print(
                 f"{','.join(album.artists)} - {album.name} "
+                f"- tracks: {len(album.tracks)} "
+                f"- size: {album.file_size / 1024:.0f}MB "
                 f"- {album.percent_rated:.0%} rated "
                 f"- max {album.max_rating} - avg {album.avg_rating:.2f}"
             )
