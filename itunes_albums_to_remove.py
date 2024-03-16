@@ -1,13 +1,26 @@
 from lxml import etree as ET
-from dataclasses import dataclass, fields
-from typing import Any
+from dataclasses import dataclass
 from pathlib import Path
 import inspect
 
 
+# Some util functions
+def snake_case(title_case_str: str) -> str:
+    return title_case_str.lower().replace(" ", "_")
+
+
+def star_rating(percent_rating: int | None) -> int:
+    """Track ratings are stored as percents in increments of 20 in iTunes/Apple Music XML
+    format e.g. 1* = 20%, 5% = 100%. Convert the XML percent rating to the integer star
+    rating."""
+    return int(percent_rating) // 20 if percent_rating is not None else 0
+
+
 @dataclass(repr=True)
 class Track:
-    # Define properties useful for this project
+    """A music track."""
+
+    # Define only the properties useful for this project
     track_id: int
     name: str
     artist: str = ""
@@ -18,6 +31,9 @@ class Track:
 
     @classmethod
     def from_xml(cls, track_xml: ET.Element) -> "Track":
+        """Build a Track by parsing the XML of a track node in the format given in an
+        iTunes/Apple Music Library.xml file."""
+        # Build a dict of all key-value pairs in the XML
         d = {}
         for key in track_xml.iter():
             if key.tag == "key":
@@ -26,11 +42,12 @@ class Track:
                 d[snake_case(key.text)] = value.text
 
         if "rating" in d:
-            # Correct rating from XML % to star rating
+            # Correct rating from XML % rating to star rating
             d["rating"] = star_rating(d["rating"])
 
         # Remove parameters not useful for this project
-        d = {k: v for k, v in d.items() if k in inspect.signature(cls).parameters}
+        dataclass_params = inspect.signature(cls).parameters
+        d = {k: v for k, v in d.items() if k in dataclass_params}
 
         return cls(**d)
 
@@ -43,31 +60,51 @@ class Track:
 
 
 class Library:
+    """Representation of an iTunes/Apple Music Library as a simple collection of tracks.
+
+    Library acts as an iterator of tracks, e.g.
+        - `for track in library:`
+        - `for track in library[:5]:`
+    """
+
     def __init__(self, tracks: list[Track]) -> None:
         self.tracks = tracks
 
     @classmethod
     def from_xml(cls, library_xml_path: str | Path) -> "Library":
+        """Build a track by parsing the XML tree for a library as is given in an
+        iTunes/Apple Music Library.xml file"""
         tree = ET.parse(library_xml_path)
         root = tree.getroot()
         tracks_root = root.xpath("//dict/dict/dict")
         return cls(tracks=[Track.from_xml(track_xml) for track_xml in tracks_root])
 
     def to_albums(self) -> list["Album"]:
-        album_name_tracks_dict = {}
+        """Group tracks into albums. Albums are current simply grouped by name and year,
+        so be aware that if multiple artists have the same album name and year, a single
+        Album object would be produced containing all those tracks."""
+
+        # Create a dict of {(album_name, album_year): [track1, track2]}
+        album_tracks_dict = {}
         for t in self.tracks:
-            if t.album not in album_name_tracks_dict:
-                album_name_tracks_dict[t.album] = []
+            album_key = (t.album, t.year)
+            if album_key not in album_tracks_dict:
+                album_tracks_dict[album_key] = []
 
-            album_name_tracks_dict[t.album].append(t)
+            album_tracks_dict[album_key].append(t)
 
-        return [Album(tracks) for tracks in album_name_tracks_dict.values()]
+        # Create album objects from each list of tracks
+        return [Album(tracks) for tracks in album_tracks_dict.values()]
+
+    @property
+    def size(self):
+        return len(self.tracks)
 
     def __repr__(self):
-        return f"{self.__class__.__name__}(tracks={self.tracks[:10]}...)"
+        return f"Library(tracks={self.tracks[:10]}...)"
 
     def __str__(self):
-        return f"{self.__class__.__name__} with {len(self.tracks)} tracks"
+        return f"Library with {len(self.tracks)} tracks"
 
     def __iter__(self):
         return iter(self.tracks)
@@ -77,7 +114,14 @@ class Library:
 
 
 class Album(Library):
+    """Representation of an album as a simple collection of tracks."""
+
     def __init__(self, tracks: list[Track]) -> None:
+        if not all(track.album == tracks[0].album for track in tracks):
+            raise ValueError(
+                "Cannot create an album from tracks that do not share the same album property."
+            )
+
         self.tracks = tracks
 
         self.name = self.tracks[0].album
@@ -105,23 +149,11 @@ class Album(Library):
 
     @property
     def percent_rated(self) -> float:
+        """The percent of tracks in the album that have non-zero ratings."""
         non_zero_ratings = [r for r in self._ratings if r is not None and r > 0]
         return len(non_zero_ratings) / len(self.tracks)
 
 
-def snake_case(title_case_str: str) -> str:
-    return title_case_str.lower().replace(" ", "_")
-
-
-def star_rating(rating: int) -> int:
-    return int(rating) // 20 if rating is not None else 0
-
-
-def print_element(e: ET.ElementBase) -> None:
-    print(ET.tostring(e, pretty_print=True))
-
-
-# Replace 'your_itunes_library.xml' with the actual path to your iTunes Library XML file
 LIBRARY_XML_PATH = Path(
     "/Users/stephen/Music/Apple Music/20240226 iTunes Music Library.xml"
 )
