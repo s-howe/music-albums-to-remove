@@ -188,7 +188,7 @@ if __name__ == "__main__":
             print(
                 f"{','.join(album.artists)} - {album.name} "
                 f"- tracks: {len(album.tracks)} "
-                f"- size: {album.file_size / 1024:.0f}MB "
+                f"- size: {album.file_size / (1024 x 1024):.0f}MB "
                 f"- {album.percent_rated:.0%} rated "
                 f"- max {album.max_rating} - avg {album.avg_rating:.2f}"
             )
