@@ -2,8 +2,23 @@ from lxml import etree as ET
 from dataclasses import dataclass
 from pathlib import Path
 import inspect
+from argparse import ArgumentParser
 
-track_keys = {}
+
+def parse_args():
+    parser = ArgumentParser(
+        description="Recommend albums to remove from iTunes/Apple Music by parsing "
+        "the library XML file."
+    )
+    parser.add_argument(
+        "library_xml_file_path",
+        type=Path,
+        help=(
+            "Path to the iTunes/Apple Music library XML file. This is usually found "
+            " at /Users/username/Music/Music/library.xml"
+        ),
+    )
+    return parser.parse_args()
 
 
 # Some util functions
@@ -173,12 +188,15 @@ class Album(Library):
         return len(non_zero_ratings) / len(self.tracks)
 
 
-LIBRARY_XML_PATH = Path(
-    "/Users/stephen/Music/Apple Music/20240226 iTunes Music Library.xml"
-)
-
 if __name__ == "__main__":
-    library = Library.from_xml(LIBRARY_XML_PATH)
+    args = parse_args()
+
+    if not Path(args.library_xml_file_path).exists():
+        raise FileNotFoundError(
+            f"Given library XML file path does not exist: {args.library_xml_file_path}"
+        )
+
+    library = Library.from_xml(args.library_xml_file_path)
     albums = library.to_albums()
 
     albums_sorted = sorted(albums, key=lambda a: a.file_size, reverse=True)
