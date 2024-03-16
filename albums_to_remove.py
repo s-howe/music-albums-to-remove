@@ -28,7 +28,7 @@ def snake_case(title_case_str: str) -> str:
 
 def star_rating(percent_rating: int | None) -> int:
     """Track ratings are stored as percents in increments of 20 in iTunes/Apple Music XML
-    format e.g. 1* = 20%, 5% = 100%. Convert the XML percent rating to the integer star
+    format e.g. 1* = 20%, 5* = 100%. Convert the XML percent rating to the integer star
     rating."""
     return int(percent_rating) // 20 if percent_rating is not None else 0
 
