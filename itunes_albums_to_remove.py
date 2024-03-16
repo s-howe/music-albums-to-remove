@@ -106,9 +106,9 @@ class Library:
         return cls(tracks=[Track.from_xml(track_xml) for track_xml in tracks_root])
 
     def to_albums(self) -> list["Album"]:
-        """Group tracks into albums. Albums are current simply grouped by name and year,
-        so be aware that if multiple artists have the same album name and year, a single
-        Album object would be produced containing all those tracks."""
+        """Group tracks into albums. Albums are currently simply grouped by name and
+        year, so be aware that if multiple artists have the same album name and year, a
+        single Album object would be produced containing all those tracks."""
 
         # Create a dict of {(album_name, album_year): [track1, track2]}
         album_tracks_dict = {}
